@@ -139,7 +139,10 @@ header.nav.scrolled{border-bottom-color:var(--line);background:color-mix(in srgb
 /* hero visual */
 .shot{margin:52px auto 0;max-width:940px;position:relative}
 .window{border-radius:var(--r-lg);border:1px solid var(--line2);background:var(--surface);
-  box-shadow:var(--shadow);overflow:hidden}
+  box-shadow:var(--shadow);overflow:hidden;position:relative}
+/* live-conversion morph canvas (drawn over the screenshot) */
+.hero-fx{position:absolute;pointer-events:none;z-index:4;left:0;top:0;width:0;height:0}
+@media(prefers-reduced-motion:reduce){.hero-fx{display:none}}
 .window .bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface2)}
 .window .bar i{width:11px;height:11px;border-radius:50%;background:var(--line2);display:block}
 .window .bar i:nth-child(1){background:#ff5f57}.window .bar i:nth-child(2){background:#febc2e}.window .bar i:nth-child(3){background:#28c840}
@@ -468,6 +471,7 @@ main,footer{position:relative;z-index:1}
         <div class="bar"><i></i><i></i><i></i><span>Filaxy PDF Converter</span></div>
         <img class="d" src="/assets/screens/verify-dark.png" alt="Fidelity report after a conversion" />
         <img class="l" src="/assets/screens/verify-light.png" alt="Fidelity report after a conversion" />
+        <canvas class="hero-fx" aria-hidden="true"></canvas>
       </div>
       <div class="float-badge">
         <span class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
@@ -815,6 +819,133 @@ main,footer{position:relative;z-index:1}
   document.querySelector(".lb-close").addEventListener("click",closeLb);
   lb.addEventListener("click",function(e){if(e.target===lb)closeLb();});
   addEventListener("keydown",function(e){if(e.key==="Escape")closeLb();});
+
+  // ---- hero: cinematic "PDF shatters → Word doc" conversion over the screenshot ----
+  (function(){
+    if(reduce) return;
+    var win=document.querySelector(".hero .window");
+    var cv=win&&win.querySelector(".hero-fx");
+    if(!win||!cv) return;
+    var ctx=cv.getContext("2d"), DPR=Math.min(2,devicePixelRatio||1);
+    var W=0,H=0,sh=[],embers=[],T0=0,raf=0,running=false;
+    var css=getComputedStyle(document.documentElement);
+    var RED=(css.getPropertyValue("--brand").trim())||"#D8131E";
+    var RED2=(css.getPropertyValue("--brand2").trim())||"#F0453C";
+    var BLUE="#2b6fd6",BLUE2="#1e5fc0"; // Word blue
+    var backdrop="#0b0a0b",paper="#f2eeeb",paperTxt="#c9c3bd",paperTxt2="#c3c8d2";
+    function theme(){var l=document.documentElement.getAttribute("data-theme")==="light";
+      backdrop=l?"#e7e4e4":"#0b0a0b"; paper=l?"#ffffff":"#f3efec"; paperTxt=l?"#d8d2ce":"#cbc5bf"; paperTxt2=l?"#d3d8e2":"#c3c8d2";}
+    function vimg(){return [].find.call(win.querySelectorAll("img"),function(i){return getComputedStyle(i).display!=="none";});}
+    function size(){
+      var im=vimg(); if(!im||!im.complete||!im.naturalWidth) return false;
+      var wr=win.getBoundingClientRect(), ir=im.getBoundingClientRect();
+      if(ir.width<20) return false;
+      cv.style.left=(ir.left-wr.left)+"px"; cv.style.top=(ir.top-wr.top)+"px";
+      cv.style.width=ir.width+"px"; cv.style.height=ir.height+"px";
+      W=cv.width=Math.round(ir.width*DPR); H=cv.height=Math.round(ir.height*DPR);
+      return true;
+    }
+    var ease=function(t){return t<0?0:t>1?1:t*t*(3-2*t);};
+    var eOut=function(t){return t<0?0:t>1?1:1-Math.pow(1-t,3);};
+    function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+    var MX,MY,PW,PH,CX,CY; // page geometry
+    function build(){
+      theme();
+      MX=W*0.075; MY=H*0.075; PW=W-2*MX; PH=H-2*MY; CX=MX+PW/2; CY=MY+PH/2;
+      var cols=11, rows=15, sw=PW/cols, shh=PH/rows, maxD=Math.hypot(PW/2,PH/2);
+      sh=[];
+      for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+        var hx=MX+c*sw, hy=MY+r*shh, ccx=hx+sw/2, ccy=hy+shh/2;
+        var dist=Math.hypot(ccx-CX,ccy-CY), ang=Math.atan2(ccy-CY,ccx-CX);
+        var head=hy<MY+PH*0.155, base={hx:hx,hy:hy,cx:ccx,cy:ccy,w:sw*0.92,h:shh*0.92,head:head};
+        var sp=(0.35+dist/maxD)*(300+Math.random()*300);
+        // red PDF shard — assembled, then explodes outward
+        sh.push(Object.assign({},base,{kind:0, col:head?(c%2?RED2:RED):(Math.random()<0.16?paperTxt:paper),
+          vx:Math.cos(ang)*sp+(Math.random()-0.5)*90, vy:Math.sin(ang)*sp-190, rv:(Math.random()-0.5)*7, delay:(dist/maxD)*0.2}));
+        // blue Word block — flies in from scatter and assembles into the page
+        sh.push(Object.assign({},base,{kind:1, col:head?(c%2?BLUE2:BLUE):(Math.random()<0.16?paperTxt2:paper),
+          sx:ccx+(Math.random()-0.5)*W*0.9, sy:ccy+(Math.random()-0.5)*H*0.9, srot:(Math.random()-0.5)*2.2, d2:(1-dist/maxD)*0.18+Math.random()*0.05}));
+      }
+      embers=[];
+      for(var k=0;k<16;k++)embers.push({x:Math.random()*W,y:Math.random()*H,
+        s:(2.5+Math.random()*4)*DPR, vy:(0.05+Math.random()*0.12)*DPR, a:0.05+Math.random()*0.07, col:Math.random()<0.5?RED:RED2});
+    }
+    // page label ("PDF" / "DOCX") + folded corner while the page is intact
+    function label(txt,alpha){
+      if(alpha<=0)return; ctx.save();ctx.globalAlpha=Math.min(1,alpha);
+      var fold=Math.min(PW,PH)*0.16, fx=MX+PW;
+      ctx.fillStyle=paper;ctx.beginPath();ctx.moveTo(fx-fold,MY);ctx.lineTo(fx,MY+fold);ctx.lineTo(fx-fold,MY+fold);ctx.closePath();ctx.fill();
+      ctx.fillStyle="#fff";ctx.font="800 "+Math.round(PH*0.072)+"px "+(css.getPropertyValue("--font")||"sans-serif");
+      ctx.textBaseline="middle";ctx.fillText(txt,MX+PW*0.07,MY+PH*0.078);
+      ctx.restore();
+    }
+    // phase timing (s): A hold 0-1.0 · B shatter 1.0-2.6 · C reveal 2.4-4.2 · D verify 4.2-5.6
+    function frame(now){
+      if(!W){running=false;return;}
+      var t=(now-T0)/1000;
+      ctx.clearRect(0,0,W,H);
+      // phases (s): A page 0-1 · B PDF shatter 1-2.4 · C Word assemble 2.25-3.9 · D wipe reveal 4.15-5.15
+      var reveal=W*ease((t-4.15)/1.0);
+      // backdrop hides the real screenshot to the RIGHT of the wipe
+      if(reveal<W){ctx.save();ctx.beginPath();ctx.rect(reveal,0,W-reveal,H);ctx.clip();
+        ctx.fillStyle=backdrop;ctx.fillRect(reveal,0,W-reveal,H);ctx.restore();}
+      function bloom(cx,cy,rad,r,g,b,al){if(al<=0)return;var gr=ctx.createRadialGradient(cx,cy,0,cx,cy,rad);
+        gr.addColorStop(0,"rgba("+r+","+g+","+b+","+al+")");gr.addColorStop(1,"rgba("+r+","+g+","+b+",0)");
+        ctx.save();ctx.globalCompositeOperation="screen";ctx.fillStyle=gr;ctx.fillRect(0,0,W,H);ctx.restore();}
+      // red bloom while PDF shatters, blue bloom while Word assembles, white flash at the reveal
+      if(t>1.0&&t<2.5)bloom(CX,CY,PW*0.6,255,80,70,Math.sin(Math.min(1,(t-1.0)/1.0)*Math.PI)*0.45);
+      if(t>2.4&&t<3.95)bloom(CX,CY,PW*0.6,70,130,245,Math.sin(Math.min(1,(t-2.4)/1.2)*Math.PI)*0.42);
+      if(t>4.05&&t<4.6)bloom(W/2,H/2,W*0.7,255,255,255,Math.sin(Math.min(1,(t-4.05)/0.55)*Math.PI)*0.22);
+      // shards: kind 0 = red PDF (explodes), kind 1 = blue Word (assembles)
+      for(var i=0;i<sh.length;i++){var s=sh[i],a=0,px=s.cx,py=s.cy,rot=0;
+        if(s.kind===0){
+          var e=Math.max(0,(t-1.0)-s.delay);
+          if(e>0){px=s.cx+s.vx*e; py=s.cy+s.vy*e+260*e*e; rot=s.rv*e;}
+          a=(t<1.9?1:Math.max(0,1-(t-1.9)/0.55));
+        }else{
+          if(t<2.25) continue;
+          var p=eOut(Math.min(1,(t-2.25-s.d2)/1.05));
+          px=s.cx+(s.sx-s.cx)*(1-p); py=s.cy+(s.sy-s.cy)*(1-p); rot=s.srot*(1-p);
+          a=Math.min(1,(t-2.25)/0.4);
+          if(reveal>0&&s.hx<reveal) a*=Math.max(0,1-(reveal-s.hx)/(W*0.14));
+        }
+        if(a<=0.02) continue;
+        ctx.save();ctx.translate(px,py);if(rot)ctx.rotate(rot);ctx.globalAlpha=a;
+        if(s.head){ctx.shadowColor=s.col;ctx.shadowBlur=9*DPR;}
+        ctx.fillStyle=s.col;rr(-s.w/2,-s.h/2,s.w,s.h,Math.min(s.w,s.h)*0.18);ctx.fill();
+        ctx.restore();
+      }
+      // "PDF" while intact → "DOCX" once the Word page has assembled
+      label("PDF",1-ease((t-0.85)/0.5));
+      label("DOCX",ease((t-3.35)/0.45)*(1-ease((t-4.15)/0.4)));
+      // green check floating at center once DOCX is assembled, held until the blocks break
+      var chA=ease((t-3.45)/0.35)*(1-ease((t-4.15)/0.45));
+      if(chA>0){var ep=Math.min(1,(t-3.45)/0.4),
+        R=Math.min(PW,PH)*0.15*(0.5+0.5*eOut(ep))*(1+0.1*Math.sin(ep*Math.PI)), cyc=CY+Math.sin(t*3)*H*0.012;
+        ctx.save();ctx.globalAlpha=Math.min(1,chA);
+        ctx.beginPath();ctx.arc(CX,cyc,R,0,6.2832);
+        ctx.fillStyle="#28c840";ctx.shadowColor="rgba(40,200,64,.95)";ctx.shadowBlur=R*0.9;ctx.fill();ctx.shadowBlur=0;
+        ctx.strokeStyle="#fff";ctx.lineWidth=Math.max(3,R*0.16);ctx.lineCap="round";ctx.lineJoin="round";
+        ctx.beginPath();ctx.moveTo(CX-R*0.42,cyc+R*0.02);ctx.lineTo(CX-R*0.08,cyc+R*0.34);ctx.lineTo(CX+R*0.46,cyc-R*0.34);ctx.stroke();
+        ctx.restore();}
+      // wipe glowing edge
+      if(reveal>1&&reveal<W-1){ctx.save();ctx.fillStyle="#fff";ctx.shadowColor=BLUE;ctx.shadowBlur=34*DPR;
+        ctx.globalAlpha=0.92;ctx.fillRect(reveal-1.5*DPR,0,3*DPR,H);ctx.restore();}
+      // idle embers once the screenshot is fully shown
+      if(t>5.4){for(var m=0;m<embers.length;m++){var d=embers[m];d.y+=d.vy;if(d.y>H+8)d.y=-8;
+        ctx.save();ctx.globalAlpha=d.a;ctx.fillStyle=d.col;rr(d.x,d.y,d.s*0.8,d.s,d.s*0.3);ctx.fill();ctx.restore();}}
+      if(t<13.5) raf=requestAnimationFrame(frame); else {ctx.clearRect(0,0,W,H);running=false;}
+    }
+    function play(){
+      if(!size()){setTimeout(play,120);return;}
+      build();running=true;T0=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
+    }
+    addEventListener("resize",function(){if(!running)size();},{passive:true});
+    win.addEventListener("mouseenter",function(){if(!running)play();});
+    var once=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){play();once.disconnect();}});},{threshold:.35});
+    once.observe(win);
+    setInterval(function(){if(!running&&!document.hidden)play();},13000);
+  })();
 
   // ---- animated background: raining PDF files + cursor spotlight ----
   (function(){

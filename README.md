@@ -112,7 +112,7 @@ The custom domain `pdfconverter.filaxy.net` is attached to the Pages project and
 
 - 🌐 **Live site:** https://pdfconverter.filaxy.net
 - 📦 **The app:** https://github.com/othmarodev/filaxy-pdf-converter
-- 🧰 **Filaxy Labs:** https://filaxy.net
+- 🧰 **Filaxy Labs:** https://filaxylabs.co
 
 ## License
 

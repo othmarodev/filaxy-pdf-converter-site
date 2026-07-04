@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Filaxy PDF Converter — PDF → Word you can trust</title>
+<meta name="description" content="Convert any PDF to a faithful, editable Word document — then let it verify itself, line by line. Free, 100% offline, open source. macOS." />
+<link rel="icon" type="image/png" href="/assets/icon-180.png" />
+<link rel="apple-touch-icon" href="/assets/icon-180.png" />
+<meta property="og:title" content="Filaxy PDF Converter — PDF → Word you can trust" />
+<meta property="og:description" content="Faithful PDF → Word conversion that verifies its own work. Free, offline, open source." />
+<meta property="og:image" content="/assets/screens/verify-dark.png" />
+<meta property="og:type" content="website" />
+<meta name="theme-color" content="#d8131e" />
+<script>
+  // anti-flash: apply saved theme + lang before paint
+  (function () {
+    try {
+      var t = localStorage.getItem("fpc-theme");
+      if (t === "light") document.documentElement.setAttribute("data-theme", "light");
+      else if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      else document.documentElement.setAttribute("data-theme",
+        window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      var l = localStorage.getItem("fpc-lang") || "en";
+      document.documentElement.setAttribute("data-lang", l);
+      document.documentElement.lang = l;
+    } catch (e) {}
+  })();
+</script>
+<style>
+/* ============ tokens ============ */
+:root{
+  --red:#D8131E; --red-strong:#B00E17; --red-soft:#FCEAE9;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --maxw:1180px; --r:18px; --r-sm:12px; --r-lg:26px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  scroll-behavior:smooth;
+}
+html[data-theme="dark"]{
+  --bg:#0B0A0B; --bg2:#100D0F; --surface:#161114; --surface2:#1D171A;
+  --ink:#F7F3F2; --muted:#A79E9B; --faint:#7C7370;
+  --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.14);
+  --brand:#FF3B45; --brand2:#FF6A5A; --tint:rgba(255,59,69,.14);
+  --shadow:0 24px 60px -20px rgba(0,0,0,.7);
+  --glow:radial-gradient(60% 60% at 50% 0%, rgba(255,59,69,.20), transparent 70%);
+  --footer-bg:#0E0B0D;
+}
+html[data-theme="light"]{
+  --bg:#FFFFFF; --bg2:#FBF9F9; --surface:#FFFFFF; --surface2:#FCFAFA;
+  --ink:#16100F; --muted:#655E5B; --faint:#948C89;
+  --line:rgba(20,10,10,.09); --line2:rgba(20,10,10,.14);
+  --brand:#D8131E; --brand2:#F0453C; --tint:rgba(216,19,30,.08);
+  --shadow:0 30px 60px -28px rgba(180,20,25,.28);
+  --glow:radial-gradient(55% 55% at 50% 0%, rgba(216,19,30,.10), transparent 70%);
+  --footer-bg:#FBF6F6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
+  line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+section{position:relative}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--brand)}
+h1,h2,h3{margin:0;letter-spacing:-.02em;line-height:1.05;font-weight:800}
+h2{font-size:clamp(30px,4.4vw,50px)}
+.lead{color:var(--muted);font-size:clamp(16px,2vw,20px);line-height:1.55}
+.grad{background:linear-gradient(100deg,var(--brand),var(--brand2));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+/* i18n */
+[data-lang="en"] .es,[data-lang="es"] .en{display:none}
+/* reveal */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+
+/* ============ buttons ============ */
+.btn{display:inline-flex;align-items:center;gap:9px;font-weight:650;font-size:15px;
+  padding:13px 22px;border-radius:13px;border:1px solid transparent;cursor:pointer;
+  transition:transform .2s var(--ease),box-shadow .3s var(--ease),background .2s;white-space:nowrap}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:linear-gradient(180deg,var(--brand),var(--red-strong));color:#fff;
+  box-shadow:0 10px 26px -10px color-mix(in srgb,var(--brand) 70%,transparent),
+  inset 0 1px 0 rgba(255,255,255,.25)}
+.btn-primary:hover{transform:translateY(-2px);
+  box-shadow:0 18px 40px -12px color-mix(in srgb,var(--brand) 75%,transparent),
+  inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-primary .shine{position:relative;overflow:hidden}
+.btn-ghost{background:var(--surface);border-color:var(--line2);color:var(--ink)}
+.btn-ghost:hover{transform:translateY(-2px);border-color:var(--brand);color:var(--brand)}
+.btn svg{width:17px;height:17px}
+
+/* ============ nav ============ */
+header.nav{position:sticky;top:0;z-index:60;
+  backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);
+  background:color-mix(in srgb,var(--bg) 80%,transparent);border-bottom:1px solid transparent;
+  transition:border-color .3s,background .3s}
+header.nav.scrolled{border-bottom-color:var(--line);background:color-mix(in srgb,var(--bg) 88%,transparent)}
+.nav-in{display:flex;align-items:center;gap:20px;height:64px;max-width:var(--maxw);margin:0 auto;padding:0 24px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:750;letter-spacing:-.01em;font-size:15.5px}
+.brand img{width:30px;height:30px;border-radius:8px;box-shadow:0 2px 8px -2px rgba(216,19,30,.5)}
+.brand .tm{color:var(--faint);font-weight:600}
+.nav-links{display:flex;gap:6px;margin-left:14px}
+.nav-links a{position:relative;padding:8px 12px;border-radius:9px;font-size:14px;font-weight:550;color:var(--muted);
+  transition:color .2s}
+.nav-links a::after{content:"";position:absolute;left:12px;right:12px;bottom:3px;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,var(--brand),var(--brand2));transform:scaleX(0);transform-origin:left;
+  transition:transform .28s var(--ease)}
+.nav-links a:hover,.nav-links a.active{color:var(--ink)}
+.nav-links a:hover::after,.nav-links a.active::after{transform:scaleX(1)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:11px;padding:3px;background:var(--surface2);gap:2px}
+.seg button{border:0;background:transparent;color:var(--muted);font-weight:650;font-size:12.5px;
+  padding:6px 10px;border-radius:8px;cursor:pointer;transition:.18s;line-height:1}
+.seg button.on{background:var(--brand);color:#fff;box-shadow:0 3px 8px -3px color-mix(in srgb,var(--brand) 70%,transparent)}
+.seg button:not(.on):hover{color:var(--ink)}
+.icon-btn{width:38px;height:38px;display:grid;place-items:center;border:1px solid var(--line);border-radius:11px;
+  background:var(--surface2);cursor:pointer;color:var(--ink);transition:.2s}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand);transform:translateY(-1px)}
+.icon-btn svg{width:18px;height:18px}
+.nav-cta{display:none}
+@media(max-width:430px){.nav .brand .pc{display:none}}
+@media(min-width:900px){.nav-cta{display:inline-flex}}
+@media(max-width:820px){.nav-links{display:none}}
+
+/* ============ hero ============ */
+.hero{padding:70px 0 40px;text-align:center}
+.hero::before{content:"";position:absolute;inset:0;background:var(--glow);pointer-events:none}
+.badge-pill{display:inline-flex;align-items:center;gap:9px;padding:7px 14px 7px 8px;border-radius:100px;
+  border:1px solid var(--line2);background:var(--surface);font-size:13px;font-weight:550;color:var(--muted);margin-bottom:26px}
+.badge-pill b{color:var(--ink);font-weight:700}
+.badge-pill .dot{width:20px;height:20px;border-radius:50%;background:var(--tint);display:grid;place-items:center;color:var(--brand)}
+.badge-pill .dot svg{width:12px;height:12px}
+.hero h1{font-size:clamp(38px,6.6vw,74px);font-weight:850;letter-spacing:-.035em}
+.hero .lead{max-width:640px;margin:22px auto 0}
+.cta-row{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;margin-top:32px}
+.specs{margin-top:20px;font-size:13.5px;color:var(--faint);font-weight:500}
+.specs b{color:var(--muted)}
+/* hero visual */
+.shot{margin:52px auto 0;max-width:940px;position:relative}
+.window{border-radius:var(--r-lg);border:1px solid var(--line2);background:var(--surface);
+  box-shadow:var(--shadow);overflow:hidden}
+.window .bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface2)}
+.window .bar i{width:11px;height:11px;border-radius:50%;background:var(--line2);display:block}
+.window .bar i:nth-child(1){background:#ff5f57}.window .bar i:nth-child(2){background:#febc2e}.window .bar i:nth-child(3){background:#28c840}
+.window .bar span{margin-left:8px;font-size:12px;color:var(--faint);font-family:var(--mono)}
+.window img{width:100%;display:none}
+html[data-theme="dark"] .window img.d{display:block}
+html[data-theme="light"] .window img.l{display:block}
+.float-badge{position:absolute;right:-14px;top:96px;background:var(--surface);border:1px solid var(--line2);
+  border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:11px;
+  animation:floaty 5s ease-in-out infinite}
+.float-badge .ring{width:42px;height:42px;border-radius:50%;background:conic-gradient(#28c840 0 100%,transparent 0);
+  display:grid;place-items:center;color:#fff}
+.float-badge .ring svg{width:20px;height:20px}
+.float-badge b{display:block;font-size:15px;font-weight:750}
+.float-badge small{color:var(--muted);font-size:12px}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@media(max-width:640px){.float-badge{display:none}}
+
+/* logos strip */
+.strip{position:relative;margin-top:44px;padding:22px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden}
+/* light beam sweeping across the trust strip */
+.strip::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:linear-gradient(100deg,transparent 40%,color-mix(in srgb,var(--brand) 15%,transparent) 50%,transparent 60%);
+  background-size:230% 100%;background-position:130% 0;animation:stripSweep 7s ease-in-out infinite}
+@keyframes stripSweep{0%{background-position:130% 0}55%,100%{background-position:-30% 0}}
+.strip .row{position:relative;z-index:1;display:flex;gap:22px;justify-content:center;flex-wrap:wrap;align-items:center;
+  font-size:13px;color:var(--faint);font-weight:600}
+.strip .row>span{display:inline-flex;gap:8px;align-items:center;padding:7px 13px;border-radius:999px;
+  transition:color .3s var(--ease),transform .3s var(--ease),background .3s var(--ease),box-shadow .3s var(--ease)}
+.strip .row>span:hover{color:var(--brand);transform:translateY(-3px);
+  background:color-mix(in srgb,var(--brand) 8%,transparent);box-shadow:0 8px 22px -12px color-mix(in srgb,var(--brand) 60%,transparent)}
+.strip svg{width:15px;height:15px;color:var(--brand);transition:transform .4s var(--ease),filter .4s var(--ease)}
+.strip .row>span:hover svg{transform:scale(1.2) rotate(-7deg);filter:drop-shadow(0 0 6px color-mix(in srgb,var(--brand) 70%,transparent))}
+@media(prefers-reduced-motion:reduce){.strip::before{display:none}}
+
+/* ============ section header ============ */
+.sec{padding:96px 0}
+.sec-head{text-align:center;max-width:680px;margin:0 auto 54px}
+.sec-head .lead{margin-top:16px}
+
+/* ============ verify hook ============ */
+.verify-card{background:linear-gradient(180deg,var(--surface),var(--surface2));border:1px solid var(--line2);
+  border-radius:var(--r-lg);padding:44px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.verify-card::before{content:"";position:absolute;top:-40%;right:-10%;width:60%;height:120%;
+  background:radial-gradient(circle,var(--tint),transparent 65%);pointer-events:none}
+.verify-grid{display:grid;gap:14px;margin-top:8px}
+@media(min-width:720px){.verify-grid{grid-template-columns:1fr 1fr}}
+.check{display:flex;align-items:center;gap:13px;padding:16px 18px;background:var(--bg2);
+  border:1px solid var(--line);border-radius:14px}
+.check .ok{width:26px;height:26px;flex:0 0 26px;border-radius:50%;background:#28c840;display:grid;place-items:center;color:#fff}
+.check .ok svg{width:15px;height:15px}
+.check b{font-size:15px;font-weight:650}
+.check small{display:block;color:var(--muted);font-size:12.5px;font-weight:500}
+.check .val{margin-left:auto;font-size:12.5px;font-weight:700;color:#28a745;font-family:var(--mono)}
+.check{position:relative;overflow:hidden;transition:transform .3s var(--ease),border-color .3s,box-shadow .3s}
+.check:hover{transform:translateY(-2px);border-color:var(--line2);box-shadow:0 10px 26px -16px color-mix(in srgb,var(--brand) 55%,transparent)}
+/* live-verification motion (falls back to static verified state when reduced-motion) */
+.verify-card .scan{display:none}
+@media (prefers-reduced-motion:no-preference){
+  .verify-card .scan{display:block;position:absolute;left:0;right:0;top:-140px;height:140px;z-index:2;pointer-events:none;opacity:0;
+    background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--brand) 20%,transparent) 55%,transparent)}
+  .verify-card.in .scan{animation:scanDown 1.7s var(--ease) .05s 1}
+  .verify-grid .check .ok{background:color-mix(in srgb,var(--muted) 42%,transparent)}
+  .verify-grid .check .ok svg path{stroke-dasharray:26;stroke-dashoffset:26}
+  .verify-grid .check .val{opacity:.32;filter:grayscale(.9)}
+  .verify-grid.in .check .ok{animation:okPop .55s var(--ease) both}
+  .verify-grid.in .check .ok svg path{animation:drawCheck .5s var(--ease) both}
+  .verify-grid.in .check .val{animation:valIn .5s var(--ease) both}
+  .verify-grid.in .check:nth-child(1) .ok,.verify-grid.in .check:nth-child(1) .ok svg path,.verify-grid.in .check:nth-child(1) .val{animation-delay:.25s}
+  .verify-grid.in .check:nth-child(2) .ok,.verify-grid.in .check:nth-child(2) .ok svg path,.verify-grid.in .check:nth-child(2) .val{animation-delay:.5s}
+  .verify-grid.in .check:nth-child(3) .ok,.verify-grid.in .check:nth-child(3) .ok svg path,.verify-grid.in .check:nth-child(3) .val{animation-delay:.75s}
+  .verify-grid.in .check:nth-child(4) .ok,.verify-grid.in .check:nth-child(4) .ok svg path,.verify-grid.in .check:nth-child(4) .val{animation-delay:1s}
+}
+@keyframes scanDown{0%{top:-140px;opacity:0}12%{opacity:1}88%{opacity:1}100%{top:100%;opacity:0}}
+@keyframes okPop{0%{transform:scale(.5);background:color-mix(in srgb,var(--muted) 42%,transparent)}55%{transform:scale(1.2);background:#28c840}100%{transform:scale(1);background:#28c840}}
+@keyframes drawCheck{to{stroke-dashoffset:0}}
+@keyframes valIn{from{opacity:.32;filter:grayscale(.9)}to{opacity:1;filter:none}}
+
+/* ============ bento ============ */
+.bento{display:grid;gap:16px;grid-template-columns:repeat(6,1fr)}
+.tile{grid-column:span 6;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:28px;transition:transform .3s var(--ease),border-color .3s,box-shadow .3s;position:relative;overflow:hidden}
+.tile:hover{transform:translateY(-4px);border-color:var(--line2);box-shadow:var(--shadow)}
+.tile .ic{width:46px;height:46px;border-radius:13px;background:var(--tint);color:var(--brand);
+  display:grid;place-items:center;margin-bottom:16px}
+.tile .ic svg{width:23px;height:23px}
+.tile h3{font-size:19px;font-weight:720;margin-bottom:8px}
+.tile p{color:var(--muted);font-size:14.5px;margin:0}
+@media(min-width:760px){
+  .tile{grid-column:span 2}
+  .tile.wide{grid-column:span 3}
+}
+
+/* ============ how it works ============ */
+.steps{display:grid;gap:20px;counter-reset:s}
+@media(min-width:820px){.steps{grid-template-columns:repeat(3,1fr)}}
+.step{position:relative;padding:30px 26px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.step .n{counter-increment:s;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--brand);
+  border:1px solid var(--line2);border-radius:10px;width:38px;height:38px;display:grid;place-items:center;margin-bottom:18px}
+.step .n::before{content:"0" counter(s)}
+.step h3{font-size:18px;margin-bottom:9px}
+.step p{color:var(--muted);font-size:14.5px;margin:0}
+
+/* ============ gallery ============ */
+.gallery{display:grid;gap:16px;grid-template-columns:repeat(2,1fr)}
+@media(min-width:820px){.gallery{grid-template-columns:repeat(3,1fr)}}
+.gallery figure{margin:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);
+  box-shadow:0 10px 30px -18px rgba(0,0,0,.4);transition:transform .3s var(--ease)}
+.gallery figure:hover{transform:translateY(-4px)}
+.gallery img{width:100%}
+.gallery figcaption{padding:12px 16px;font-size:13px;color:var(--muted);font-weight:550;border-top:1px solid var(--line)}
+
+/* ============ download ============ */
+.dl{display:grid;gap:18px}
+@media(min-width:820px){.dl{grid-template-columns:1.2fr 1fr}}
+.dl-card{background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);padding:34px;box-shadow:var(--shadow)}
+.dl-card h3{font-size:20px;margin-bottom:6px}
+.dl-card p{color:var(--muted);font-size:14.5px;margin:0 0 22px}
+.brew{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;font-family:var(--mono);font-size:13.5px;overflow-x:auto}
+.brew code{color:var(--ink);white-space:nowrap}
+.brew .cp{margin-left:auto;flex:0 0 auto;border:1px solid var(--line2);background:var(--surface);border-radius:8px;
+  padding:6px 10px;font-size:12px;font-family:var(--font);font-weight:650;cursor:pointer;color:var(--muted);transition:.2s}
+.brew .cp:hover{color:var(--brand);border-color:var(--brand)}
+.arch{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+.arch a{flex:1;min-width:150px;display:flex;align-items:center;gap:12px;padding:15px 17px;border:1px solid var(--line);
+  border-radius:14px;background:var(--bg2);transition:.25s var(--ease)}
+.arch a:hover{border-color:var(--brand);transform:translateY(-2px)}
+.arch .chip{width:38px;height:38px;border-radius:10px;background:var(--tint);color:var(--brand);display:grid;place-items:center;flex:0 0 auto}
+.arch b{display:block;font-size:14.5px;font-weight:680}
+.arch small{color:var(--faint);font-size:12px}
+.trust{display:grid;gap:12px}
+.trust .t{display:flex;align-items:flex-start;gap:12px;font-size:14px}
+.trust .t svg{width:18px;height:18px;color:var(--brand);flex:0 0 auto;margin-top:2px}
+.trust .t b{font-weight:650}.trust .t span{color:var(--muted)}
+
+/* ============ donations ============ */
+.donate{display:grid;gap:16px}
+@media(min-width:720px){.donate{grid-template-columns:1fr 1fr}}
+.don-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:28px;text-align:center}
+.don-card .ic{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;margin:0 auto 14px;
+  background:var(--tint);color:var(--brand)}
+.don-card h3{font-size:18px;margin-bottom:6px}
+.don-card p{color:var(--muted);font-size:14px;margin:0 0 18px}
+.don-card .qr{width:150px;height:150px;margin:0 auto 16px;background:#fff;padding:9px;border-radius:14px;
+  border:1px solid var(--line2);box-shadow:0 10px 26px -14px rgba(0,0,0,.45);image-rendering:pixelated}
+.usdt{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:11px;
+  padding:10px 12px;font-family:var(--mono);font-size:12px}
+.usdt code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.usdt .cp{flex:0 0 auto;border:1px solid var(--line2);background:var(--surface);border-radius:7px;padding:5px 10px;
+  font-family:var(--font);font-weight:650;font-size:11.5px;cursor:pointer;color:var(--muted)}
+.usdt .cp:hover{color:var(--brand);border-color:var(--brand)}
+.warn{margin-top:11px;font-size:11.5px;color:var(--faint)}
+
+/* ============ closing cta ============ */
+.close-cta{text-align:center;background:linear-gradient(180deg,var(--surface),var(--bg2));
+  border:1px solid var(--line2);border-radius:var(--r-lg);padding:64px 32px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.close-cta::before{content:"";position:absolute;inset:0;background:var(--glow)}
+.close-cta > *{position:relative}
+.close-cta h2{font-size:clamp(30px,4.6vw,46px)}
+.close-cta .lead{max-width:520px;margin:16px auto 30px}
+
+/* ============ footer ============ */
+footer{background:var(--footer-bg);border-top:1px solid var(--line);margin-top:96px;padding:56px 0 34px}
+.foot{display:grid;gap:34px;grid-template-columns:1fr}
+@media(min-width:760px){.foot{grid-template-columns:1.4fr 1fr 1fr}}
+.foot .brand img{width:34px;height:34px}
+.foot p{color:var(--muted);font-size:14px;margin:14px 0 0;max-width:300px}
+.foot h4{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:0 0 14px;font-weight:700}
+.foot ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.foot ul a{color:var(--muted);font-size:14px;font-weight:500;position:relative;transition:color .2s}
+.foot ul a:hover{color:var(--brand)}
+.foot-bottom{max-width:var(--maxw);margin:40px auto 0;padding:22px 24px 0;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;color:var(--faint);font-size:13px}
+.foot-bottom a{color:var(--muted)}.foot-bottom a:hover{color:var(--brand)}
+
+/* ============ animated background + cursor spotlight ============ */
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+.spotlight{position:fixed;inset:0;z-index:0;pointer-events:none;mix-blend-mode:screen;
+  background:radial-gradient(440px 440px at var(--mx,50%) var(--my,-15%),color-mix(in srgb,var(--brand) 20%,transparent),transparent 68%)}
+html[data-theme="light"] .spotlight{mix-blend-mode:multiply;
+  background:radial-gradient(500px 500px at var(--mx,50%) var(--my,-15%),color-mix(in srgb,var(--brand) 11%,transparent),transparent 68%)}
+main,footer{position:relative;z-index:1}
+
+/* ============ marquee ============ */
+.marquee-sec{padding:2px 0 30px;text-align:center;overflow:hidden}
+.mq-label{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:16px}
+.marquee{position:relative;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.mq-track{display:inline-flex;align-items:center;gap:20px;white-space:nowrap;animation:mq 46s linear infinite;
+  font-size:clamp(19px,2.9vw,32px);font-weight:800;letter-spacing:-.02em;padding-left:20px}
+.mq-track span{color:var(--ink);opacity:.55}
+.mq-track b{color:var(--brand);font-weight:900;opacity:.9}
+.marquee:hover .mq-track{animation-play-state:paused}
+@keyframes mq{to{transform:translateX(-50%)}}
+
+/* ============ card tilt + moving spotlight ============ */
+.tile,.don-card,.dl-card,.step{transition:transform .2s var(--ease),border-color .3s,box-shadow .3s}
+.tile::after,.don-card::after,.dl-card::after,.step::after{content:"";position:absolute;inset:0;border-radius:inherit;
+  background:radial-gradient(260px 260px at var(--cx,50%) var(--cy,50%),color-mix(in srgb,var(--brand) 15%,transparent),transparent 65%);
+  opacity:0;transition:opacity .3s;pointer-events:none}
+.tile:hover::after,.don-card:hover::after,.dl-card:hover::after,.step:hover::after{opacity:1}
+.tile>*,.step>*{position:relative;z-index:1}
+
+/* ============ neon border beam (vault-style, red palette) ============ */
+@property --beam{syntax:"<angle>";initial-value:0deg;inherits:false}
+.don-card,.dl-card,.gallery figure{position:relative}
+.tile::before,.step::before,.dl-card::before,.don-card::before,.gallery figure::before,
+.check::before,.verify-card::after,.close-cta::after{
+  content:"";position:absolute;inset:0;z-index:2;border-radius:inherit;padding:1.5px;pointer-events:none;
+  background:
+    conic-gradient(from var(--beam),
+      transparent 0deg,transparent 205deg,
+      var(--brand) 268deg,var(--brand2) 315deg,transparent 360deg),
+    linear-gradient(135deg,color-mix(in srgb,var(--brand) 20%,transparent),color-mix(in srgb,var(--brand2) 12%,transparent));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:.5;transition:opacity .3s ease;
+  animation:card-beam 5s linear infinite}
+.tile:hover::before,.step:hover::before,.dl-card:hover::before,.don-card:hover::before,
+.gallery figure:hover::before,.check:hover::before,.verify-card:hover::after,.close-cta:hover::after{opacity:1}
+@keyframes card-beam{to{--beam:360deg}}
+/* desync neighbours so the beams don't march in lockstep */
+.tile:nth-child(2)::before,.step:nth-child(2)::before,.dl-card:nth-child(2)::before,.don-card:nth-child(2)::before,.gallery figure:nth-child(2)::before,.check:nth-child(2)::before{animation-delay:-.9s}
+.tile:nth-child(3)::before,.step:nth-child(3)::before,.gallery figure:nth-child(3)::before,.check:nth-child(3)::before{animation-delay:-1.9s}
+.tile:nth-child(4)::before,.check:nth-child(4)::before{animation-delay:-2.7s}
+.tile:nth-child(5)::before{animation-delay:-3.4s}
+@media (prefers-reduced-motion:reduce){
+  .tile::before,.step::before,.dl-card::before,.don-card::before,.gallery figure::before,.check::before,.verify-card::after,.close-cta::after{animation:none;opacity:.4}
+}
+
+/* ============ stagger children ============ */
+.reveal.stagger{opacity:1;transform:none;transition:none}
+.reveal.stagger>*{opacity:0;transform:translateY(20px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.reveal.stagger.in>*{opacity:1;transform:none}
+
+/* ============ gallery zoom + lightbox ============ */
+.gallery figure{cursor:zoom-in}
+.gallery figure .zi{position:absolute;top:10px;right:12px;z-index:3;width:30px;height:30px;display:grid;place-items:center;
+  border-radius:9px;background:color-mix(in srgb,var(--bg) 65%,transparent);color:var(--brand);
+  border:1px solid var(--line2);opacity:0;transform:scale(.8);transition:.25s var(--ease);pointer-events:none}
+.gallery figure:hover .zi{opacity:1;transform:scale(1)}
+.gallery figure .zi svg{width:15px;height:15px}
+.window{cursor:zoom-in}
+.lightbox{position:fixed;inset:0;z-index:200;display:none;place-items:center;padding:5vw;
+  background:color-mix(in srgb,#000 80%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.lightbox.open{display:grid;animation:lbfade .25s var(--ease)}
+@keyframes lbfade{from{opacity:0}to{opacity:1}}
+.lb-fig{margin:0;max-width:1120px;max-height:88vh}
+.lb-fig img{width:100%;height:auto;max-height:88vh;border-radius:16px;border:1px solid var(--line2);
+  box-shadow:0 40px 120px -30px #000;animation:lbpop .35s var(--ease)}
+@keyframes lbpop{from{transform:scale(.93);opacity:.3}to{transform:scale(1);opacity:1}}
+.lb-close{position:fixed;top:20px;right:24px;width:46px;height:46px;border-radius:13px;border:1px solid var(--line2);
+  background:var(--surface);color:var(--ink);font-size:24px;line-height:1;cursor:pointer;transition:.25s var(--ease)}
+.lb-close:hover{color:var(--brand);border-color:var(--brand);transform:rotate(90deg)}
+
+/* ============ float badge pulse ============ */
+.float-badge .ring{box-shadow:0 0 0 0 rgba(40,200,64,.5);animation:floaty 5s ease-in-out infinite,pulse 2.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(40,200,64,.45)}70%{box-shadow:0 0 0 14px rgba(40,200,64,0)}100%{box-shadow:0 0 0 0 rgba(40,200,64,0)}}
+
+@media (prefers-reduced-motion:reduce){#bg,.spotlight{display:none}.mq-track{animation:none}.float-badge .ring{animation:none}}
+</style>
+</head>
+<body>
+
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="spotlight" aria-hidden="true"></div>
+
+<!-- ============ NAV ============ -->
+<header class="nav" id="nav">
+  <div class="nav-in">
+    <a href="#top" class="brand"><img src="/assets/icon.png" alt="Filaxy PDF Converter" />
+      Filaxy<span class="tm">™</span><span class="pc">&nbsp;PDF Converter</span></a>
+    <nav class="nav-links">
+      <a href="#verify" class="en">Verification</a><a href="#verify" class="es">Verificación</a>
+      <a href="#features" class="en">Features</a><a href="#features" class="es">Funciones</a>
+      <a href="#how" class="en">How it works</a><a href="#how" class="es">Cómo funciona</a>
+      <a href="#gallery" class="en">Screenshots</a><a href="#gallery" class="es">Capturas</a>
+      <a href="#download" class="en">Download</a><a href="#download" class="es">Descargar</a>
+    </nav>
+    <div class="nav-right">
+      <div class="seg" role="group" aria-label="Language">
+        <button data-lang-btn="en">EN</button><button data-lang-btn="es">ES</button>
+      </div>
+      <button class="icon-btn" id="theme" aria-label="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5 4 4M20 20l-1-1M5 19l-1 1M20 4l-1 1"/></svg>
+      </button>
+      <a href="#download" class="btn btn-primary nav-cta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+        <span class="en">Download</span><span class="es">Descargar</span></a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap">
+    <span class="badge-pill reveal">
+      <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+      <span class="en">Free · Open source · <b>Verifies its own work</b></span>
+      <span class="es">Gratis · Open source · <b>Verifica su propio trabajo</b></span>
+    </span>
+    <h1 class="reveal">
+      <span class="en">PDF → Word<br>you can <span class="grad">trust</span>.</span>
+      <span class="es">PDF → Word en el<br>que podés <span class="grad">confiar</span>.</span>
+    </h1>
+    <p class="lead reveal">
+      <span class="en">Convert any PDF to a faithful, editable Word document — then let it <b>verify itself, line by line</b>. Every number, date and signature, checked against the original.</span>
+      <span class="es">Convertí cualquier PDF a un Word fiel y editable — y dejá que se <b>verifique a sí mismo, línea por línea</b>. Cada número, fecha y firma, chequeados contra el original.</span>
+    </p>
+    <div class="cta-row reveal">
+      <a href="#download" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-.9-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7s-1.6-.7-2.6-.7c-1.3 0-2.6.8-3.2 2-1.4 2.4-.4 6 1 8 .6 1 1.4 2 2.4 2s1.3-.6 2.5-.6 1.5.6 2.5.6 1.7-.9 2.3-1.9c.7-1 1-2 1-2s-1.7-.7-1.7-3ZM14.6 6c.5-.7.9-1.6.8-2.5-.8 0-1.7.5-2.2 1.1-.5.6-1 1.5-.8 2.4.9.1 1.8-.4 2.2-1Z"/></svg>
+        <span class="en">Download for macOS</span><span class="es">Descargar para macOS</span></a>
+      <a href="https://github.com/othmarodev/filaxy-pdf-converter" class="btn btn-ghost" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 8.8 21.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .8.1-.6.3-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-4.9 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.3.2 2.3.1 2.6.6.7 1 1.6 1 2.7 0 3.8-2.3 4.7-4.6 4.9.4.3.7.9.7 1.9v2.7c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></svg>
+        <span class="en">View on GitHub</span><span class="es">Ver en GitHub</span></a>
+    </div>
+    <p class="specs reveal"><b>Free</b> · Universal (Intel &amp; Apple Silicon) · Apple-notarized · macOS 13+</p>
+
+    <div class="shot reveal">
+      <div class="window">
+        <div class="bar"><i></i><i></i><i></i><span>Filaxy PDF Converter</span></div>
+        <img class="d" src="/assets/screens/verify-dark.png" alt="Fidelity report after a conversion" />
+        <img class="l" src="/assets/screens/verify-light.png" alt="Fidelity report after a conversion" />
+      </div>
+      <div class="float-badge">
+        <span class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <span><b>100%</b><small class="en">verified</small><small class="es">verificado</small></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="wrap"><div class="row">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg><span class="en">Signed &amp; notarized</span><span class="es">Firmado y notarizado</span></span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg><span class="en">100% offline &amp; private</span><span class="es">100% offline y privado</span></span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg><span class="en">Open source · MIT</span><span class="es">Open source · MIT</span></span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H4zM8 20h8M12 16v4"/></svg><span class="en">Renders in Microsoft Word</span><span class="es">Rinde en Microsoft Word</span></span>
+    </div></div>
+  </div>
+</section>
+
+<!-- ============ MARQUEE ============ -->
+<section class="marquee-sec" aria-hidden="true">
+  <div class="mq-label"><span class="en">Built for the documents that matter</span><span class="es">Hecho para los documentos que importan</span></div>
+  <div class="marquee"><div class="mq-track">
+    <span class="en">Salary certificates</span><span class="es">Constancias salariales</span><b>·</b>
+    <span class="en">Invoices</span><span class="es">Facturas electrónicas</span><b>·</b>
+    <span class="en">Contracts</span><span class="es">Contratos</span><b>·</b>
+    <span class="en">Bank statements</span><span class="es">Estados de cuenta</span><b>·</b>
+    <span class="en">Payroll</span><span class="es">Pagos de nómina</span><b>·</b>
+    <span class="en">Tax forms</span><span class="es">Formularios tributarios</span><b>·</b>
+    <span class="en">Powers of attorney</span><span class="es">Poderes legales</span><b>·</b>
+    <span class="en">Receipts</span><span class="es">Recibos</span><b>·</b>
+    <span class="en">Salary certificates</span><span class="es">Constancias salariales</span><b>·</b>
+    <span class="en">Invoices</span><span class="es">Facturas electrónicas</span><b>·</b>
+    <span class="en">Contracts</span><span class="es">Contratos</span><b>·</b>
+    <span class="en">Bank statements</span><span class="es">Estados de cuenta</span><b>·</b>
+    <span class="en">Payroll</span><span class="es">Pagos de nómina</span><b>·</b>
+    <span class="en">Tax forms</span><span class="es">Formularios tributarios</span><b>·</b>
+    <span class="en">Powers of attorney</span><span class="es">Poderes legales</span><b>·</b>
+    <span class="en">Receipts</span><span class="es">Recibos</span><b>·</b>
+  </div></div>
+</section>
+
+<!-- ============ VERIFY HOOK ============ -->
+<section class="sec" id="verify">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="en">The difference</span><span class="es">La diferencia</span></span>
+      <h2 style="margin-top:14px"><span class="en">It checks its <span class="grad">own work</span>.</span><span class="es">Verifica su <span class="grad">propio trabajo</span>.</span></h2>
+      <p class="lead"><span class="en">Most converters hand you a file and hope. Filaxy re-reads the original PDF and flags anything that drifted — so a salary certificate, an invoice or a contract is one you can actually trust.</span>
+      <span class="es">La mayoría te entrega un archivo y cruza los dedos. Filaxy vuelve a leer el PDF original y marca lo que se corrió — para que una constancia, una factura o un contrato sea uno en el que de verdad podés confiar.</span></p>
+    </div>
+    <div class="verify-card reveal">
+      <div class="scan" aria-hidden="true"></div>
+      <div class="verify-grid">
+        <div class="check"><span class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div><b><span class="en">Original text present</span><span class="es">Texto del original presente</span></b>
+          <small><span class="en">Every line accounted for</span><span class="es">Cada línea contabilizada</span></small></div>
+          <span class="val en">Complete</span><span class="val es">Completo</span></div>
+        <div class="check"><span class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div><b><span class="en">Numbers · dates · emails</span><span class="es">Números · fechas · correos</span></b>
+          <small><span class="en">Sensitive data, cross-checked</span><span class="es">Datos sensibles, contrastados</span></small></div>
+          <span class="val en">Verified</span><span class="val es">Verificados</span></div>
+        <div class="check"><span class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div><b><span class="en">Fonts legible in Word</span><span class="es">Fuentes legibles en Word</span></b>
+          <small><span class="en">Correct glyphs, embedded</span><span class="es">Glifos correctos, embebidos</span></small></div>
+          <span class="val en">Verified</span><span class="val es">Verificadas</span></div>
+        <div class="check"><span class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div><b><span class="en">Original graphics</span><span class="es">Gráficos del original</span></b>
+          <small><span class="en">Logos, stamps, signatures</span><span class="es">Logos, sellos, firmas</span></small></div>
+          <span class="val en">Preserved</span><span class="val es">Preservados</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES / BENTO ============ -->
+<section class="sec" id="features" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="en">Features</span><span class="es">Funciones</span></span>
+      <h2 style="margin-top:14px"><span class="en">Faithful by construction.</span><span class="es">Fiel por construcción.</span></h2>
+      <p class="lead"><span class="en">Not reflowed into a soup of text — rebuilt at the exact source coordinates.</span><span class="es">No reflujado en una sopa de texto — reconstruido en las coordenadas exactas del original.</span></p>
+    </div>
+    <div class="bento reveal">
+      <div class="tile wide">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <h3><span class="en">Pixel-faithful layout</span><span class="es">Diseño pixel-perfect</span></h3>
+        <p><span class="en">A coordinate-mapping engine places every text line, image and rule where the original puts it. Position and layout are preserved by construction.</span><span class="es">Un motor de mapeo de coordenadas ubica cada línea, imagen y regla donde el original la pone. Posición y diseño preservados por construcción.</span></p>
+      </div>
+      <div class="tile wide">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <h3><span class="en">Fidelity verification</span><span class="es">Verificación de fidelidad</span></h3>
+        <p><span class="en">After converting, it re-reads the source and reports text recall, sensitive-data drift, font renderability and preserved graphics. The report is the product.</span><span class="es">Tras convertir, relee el original y reporta recall de texto, deriva de datos sensibles, legibilidad de fuentes y gráficos preservados. El reporte es el producto.</span></p>
+      </div>
+      <div class="tile">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg></div>
+        <h3><span class="en">100% offline</span><span class="es">100% offline</span></h3>
+        <p><span class="en">Everything runs on your Mac. No upload, no account, nothing leaves your computer.</span><span class="es">Todo corre en tu Mac. Sin subir nada, sin cuenta, nada sale de tu computadora.</span></p>
+      </div>
+      <div class="tile">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="8" height="16" rx="1"/><rect x="13" y="4" width="8" height="10" rx="1"/></svg></div>
+        <h3><span class="en">Batch &amp; compare</span><span class="es">Lotes y comparar</span></h3>
+        <p><span class="en">Convert a whole folder at once, and open the original next to the result to check it side by side.</span><span class="es">Convertí una carpeta entera de una, y abrí el original junto al resultado para compararlo lado a lado.</span></p>
+      </div>
+      <div class="tile">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
+        <h3><span class="en">Free &amp; open source</span><span class="es">Gratis y open source</span></h3>
+        <p><span class="en">MIT-licensed, on GitHub. Read the engine, build it yourself, trust what runs.</span><span class="es">Licencia MIT, en GitHub. Leé el motor, compilalo vos, confiá en lo que corre.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="sec" id="how" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="en">How it works</span><span class="es">Cómo funciona</span></span>
+      <h2 style="margin-top:14px"><span class="en">Three steps. Zero guesswork.</span><span class="es">Tres pasos. Cero adivinanza.</span></h2>
+    </div>
+    <div class="steps reveal">
+      <div class="step"><div class="n"></div>
+        <h3><span class="en">Drop a PDF</span><span class="es">Soltá un PDF</span></h3>
+        <p><span class="en">Drag it onto the window, or pick a whole folder for batch conversion.</span><span class="es">Arrastralo a la ventana, o elegí una carpeta entera para conversión por lotes.</span></p></div>
+      <div class="step"><div class="n"></div>
+        <h3><span class="en">The engine rebuilds it</span><span class="es">El motor lo reconstruye</span></h3>
+        <p><span class="en">Graphics are rasterised to a pixel-faithful background; text is laid back on top, editable, at its exact coordinates, with the original fonts embedded.</span><span class="es">Los gráficos se rasterizan a un fondo pixel-perfect; el texto se coloca encima, editable, en sus coordenadas exactas, con las fuentes originales embebidas.</span></p></div>
+      <div class="step"><div class="n"></div>
+        <h3><span class="en">It verifies the result</span><span class="es">Verifica el resultado</span></h3>
+        <p><span class="en">The verifier re-reads the source and hands you a fidelity report — so you know before you trust the file.</span><span class="es">El verificador relee el original y te entrega un reporte de fidelidad — para que sepas antes de confiar en el archivo.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GALLERY ============ -->
+<section class="sec" id="gallery" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="en">Screenshots</span><span class="es">Capturas</span></span>
+      <h2 style="margin-top:14px"><span class="en">Premium, calm, and fast.</span><span class="es">Premium, tranquila y rápida.</span></h2>
+    </div>
+    <div class="gallery reveal">
+      <figure><img src="/assets/screens/verify-dark.png" alt="Fidelity report — dark" loading="lazy" /><figcaption><span class="en">Fidelity report</span><span class="es">Reporte de fidelidad</span></figcaption></figure>
+      <figure><img src="/assets/screens/verify-light.png" alt="Fidelity report — light" loading="lazy" /><figcaption><span class="en">Light theme</span><span class="es">Tema claro</span></figcaption></figure>
+      <figure><img src="/assets/screens/verify-es.png" alt="Spanish interface" loading="lazy" /><figcaption><span class="en">Live ES / EN</span><span class="es">ES / EN en vivo</span></figcaption></figure>
+      <figure style="grid-column:1/-1"><img src="/assets/screens/how.png" alt="How it works panel" loading="lazy" /><figcaption><span class="en">How it works, inside the app</span><span class="es">Cómo funciona, dentro de la app</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="sec" id="download" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="en">Download</span><span class="es">Descargar</span></span>
+      <h2 style="margin-top:14px"><span class="en">Free, notarized, yours.</span><span class="es">Gratis, notarizada, tuya.</span></h2>
+      <p class="lead"><span class="en">No account. Signed with a Developer ID and notarized by Apple — opens with no Gatekeeper warnings.</span><span class="es">Sin cuenta. Firmada con Developer ID y notarizada por Apple — abre sin advertencias de Gatekeeper.</span></p>
+    </div>
+    <div class="dl reveal">
+      <div class="dl-card">
+        <h3><span class="en">Get it in one line</span><span class="es">Instalala en una línea</span></h3>
+        <p><span class="en">Homebrew installs the notarized cask and keeps it updated.</span><span class="es">Homebrew instala el cask notarizado y lo mantiene al día.</span></p>
+        <div class="brew"><code>brew install --cask othmarodev/filaxy/filaxy-pdf-converter</code>
+          <button class="cp" data-copy="brew install --cask othmarodev/filaxy/filaxy-pdf-converter"><span class="en">Copy</span><span class="es">Copiar</span></button></div>
+        <div class="arch">
+          <a href="https://github.com/othmarodev/filaxy-pdf-converter/releases/latest" target="_blank" rel="noopener">
+            <span class="chip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-.9-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7s-1.6-.7-2.6-.7c-1.3 0-2.6.8-3.2 2-1.4 2.4-.4 6 1 8 .6 1 1.4 2 2.4 2s1.3-.6 2.5-.6 1.5.6 2.5.6 1.7-.9 2.3-1.9c.7-1 1-2 1-2s-1.7-.7-1.7-3ZM14.6 6c.5-.7.9-1.6.8-2.5-.8 0-1.7.5-2.2 1.1-.5.6-1 1.5-.8 2.4.9.1 1.8-.4 2.2-1Z"/></svg></span>
+            <span><b>Apple Silicon</b><small>.dmg · arm64</small></span></a>
+          <a href="https://github.com/othmarodev/filaxy-pdf-converter/releases/latest" target="_blank" rel="noopener">
+            <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg></span>
+            <span><b>Intel</b><small>.dmg · x86_64</small></span></a>
+        </div>
+      </div>
+      <div class="dl-card">
+        <h3><span class="en">What you get</span><span class="es">Lo que obtenés</span></h3>
+        <div class="trust" style="margin-top:16px">
+          <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg><span><b class="en">Universal build.</b><b class="es">Build universal.</b> <span class="en">Runs native on Apple Silicon and Intel.</span><span class="es">Corre nativo en Apple Silicon e Intel.</span></span></div>
+          <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg><span><b class="en">Apple-notarized.</b><b class="es">Notarizada por Apple.</b> <span class="en">Clean Gatekeeper, no warnings.</span><span class="es">Gatekeeper limpio, sin avisos.</span></span></div>
+          <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg><span><b class="en">Self-contained.</b><b class="es">Autocontenida.</b> <span class="en">No Python, no dependencies to install.</span><span class="es">Sin Python ni dependencias que instalar.</span></span></div>
+          <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/></svg><span><span class="en">Requires macOS 13 (Ventura) or later.</span><span class="es">Requiere macOS 13 (Ventura) o superior.</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DONATIONS ============ -->
+<section class="sec" id="support" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="en">Free forever</span><span class="es">Gratis por siempre</span></span>
+      <h2 style="margin-top:14px"><span class="en">Support the project</span><span class="es">Apoyá el proyecto</span></h2>
+      <p class="lead"><span class="en">Filaxy PDF Converter is free. If it saved you time, a donation is voluntary and completely optional. 💛</span><span class="es">Filaxy PDF Converter es gratis. Si te ahorró tiempo, una donación es voluntaria y totalmente opcional. 💛</span></p>
+    </div>
+    <div class="donate reveal">
+      <div class="don-card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 8H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2ZM2 10h20M7 15h4"/></svg></div>
+        <h3>PayPal</h3>
+        <p><span class="en">One tap, any amount. The fastest way to chip in.</span><span class="es">Un toque, cualquier monto. La forma más rápida de aportar.</span></p>
+        <a href="https://www.paypal.com/ncp/payment/ALUEC9LDLGZ3L" class="btn btn-primary" target="_blank" rel="noopener" style="width:100%;justify-content:center">
+          <span class="en">Donate with PayPal</span><span class="es">Donar con PayPal</span></a>
+      </div>
+      <div class="don-card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/></svg></div>
+        <h3>USDT <span style="color:var(--muted);font-weight:600;font-size:14px">(TRC20)</span></h3>
+        <p><span class="en">Prefer crypto? Scan the QR or copy the address.</span><span class="es">¿Preferís cripto? Escaneá el QR o copiá la dirección.</span></p>
+        <img class="qr" src="/assets/usdt-qr.png" alt="USDT TRC20 wallet address QR" width="150" height="150" loading="lazy" />
+        <div class="usdt"><code id="usdt">TBzBitnntNvsnuP5XBwi3FhjDpVf5487sx</code>
+          <button class="cp" data-copy="TBzBitnntNvsnuP5XBwi3FhjDpVf5487sx"><span class="en">Copy</span><span class="es">Copiar</span></button></div>
+        <p class="warn"><span class="en">⚠ Send only USDT on TRON (TRC20). Another network means loss of funds.</span><span class="es">⚠ Enviá solo USDT por TRON (TRC20). Otra red = pérdida de fondos.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CLOSING CTA ============ -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap"><div class="close-cta reveal">
+    <span class="eyebrow"><span class="en">Get started</span><span class="es">Empezá</span></span>
+    <h2 style="margin-top:14px"><span class="en">Convert one you <span class="grad">actually</span> care about.</span><span class="es">Convertí uno que de verdad te <span class="grad">importe</span>.</span></h2>
+    <p class="lead"><span class="en">A constancia, an invoice, a contract — see it come out faithful, and verified.</span><span class="es">Una constancia, una factura, un contrato — vela salir fiel, y verificado.</span></p>
+    <div class="cta-row" style="margin-top:0">
+      <a href="https://github.com/othmarodev/filaxy-pdf-converter/releases/latest" class="btn btn-primary" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+        <span class="en">Download for macOS</span><span class="es">Descargar para macOS</span></a>
+      <a href="https://github.com/othmarodev/filaxy-pdf-converter" class="btn btn-ghost" target="_blank" rel="noopener">
+        <span class="en">Read the source</span><span class="es">Leé el código</span></a>
+    </div>
+  </div></div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a href="#top" class="brand"><img src="/assets/icon.png" alt="Filaxy PDF Converter" />
+          Filaxy<span class="tm">™</span> PDF Converter</a>
+        <p><span class="en">PDF → Word you can trust. Free, offline, and verified. A product of Filaxy™ Labs.</span><span class="es">PDF → Word en el que podés confiar. Gratis, offline y verificado. Un producto de Filaxy™ Labs.</span></p>
+      </div>
+      <div>
+        <h4><span class="en">Product</span><span class="es">Producto</span></h4>
+        <ul>
+          <li><a href="#verify"><span class="en">Verification</span><span class="es">Verificación</span></a></li>
+          <li><a href="#features"><span class="en">Features</span><span class="es">Funciones</span></a></li>
+          <li><a href="#how"><span class="en">How it works</span><span class="es">Cómo funciona</span></a></li>
+          <li><a href="#download"><span class="en">Download</span><span class="es">Descargar</span></a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Filaxy™ Labs</h4>
+        <ul>
+          <li><a href="https://github.com/othmarodev/filaxy-pdf-converter" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://filaxylabs.co" target="_blank" rel="noopener">filaxylabs.co</a></li>
+          <li><a href="https://filaxy.shop" target="_blank" rel="noopener">filaxy.shop</a></li>
+          <li><a href="#support"><span class="en">Support the project</span><span class="es">Apoyar el proyecto</span></a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Filaxy™ Labs Inc. · MIT · Costa Rica 🇨🇷</span>
+      <span><a href="https://github.com/othmarodev" target="_blank" rel="noopener">othmarodev</a></span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============ LIGHTBOX ============ -->
+<div class="lightbox" id="lb" aria-hidden="true">
+  <button class="lb-close" aria-label="Close">&times;</button>
+  <figure class="lb-fig"><img id="lbimg" src="" alt="" /></figure>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  // theme
+  function syncTheme(){var d=root.getAttribute("data-theme")==="dark";
+    document.querySelector("#theme .moon").style.display=d?"block":"none";
+    document.querySelector("#theme .sun").style.display=d?"none":"block";}
+  document.getElementById("theme").addEventListener("click",function(){
+    var next=root.getAttribute("data-theme")==="dark"?"light":"dark";
+    root.setAttribute("data-theme",next);localStorage.setItem("fpc-theme",next);syncTheme();});
+  syncTheme();
+  // lang
+  function syncLang(){var l=root.getAttribute("data-lang");
+    document.querySelectorAll("[data-lang-btn]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-lang-btn")===l);});}
+  document.querySelectorAll("[data-lang-btn]").forEach(function(b){b.addEventListener("click",function(){
+    var l=b.getAttribute("data-lang-btn");root.setAttribute("data-lang",l);root.lang=l;localStorage.setItem("fpc-lang",l);syncLang();});});
+  syncLang();
+  // copy
+  document.querySelectorAll("[data-copy]").forEach(function(b){b.addEventListener("click",function(){
+    navigator.clipboard.writeText(b.getAttribute("data-copy")).then(function(){
+      var prev=b.innerHTML;b.innerHTML=root.getAttribute("data-lang")==="es"?"¡Copiado!":"Copied!";
+      setTimeout(function(){b.innerHTML=prev;},1400);});});});
+  // nav scrolled
+  var nav=document.getElementById("nav");
+  addEventListener("scroll",function(){nav.classList.toggle("scrolled",scrollY>8);},{passive:true});
+  // reveal
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target);}});},{threshold:.12});
+  document.querySelectorAll(".reveal").forEach(function(el){io.observe(el);});
+  // scroll-spy
+  var links=[].slice.call(document.querySelectorAll(".nav-links a[href^='#']"));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute("href"));}).filter(Boolean);
+  var spy=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){
+    var id="#"+e.target.id;links.forEach(function(a){a.classList.toggle("active",a.getAttribute("href")===id);});}});},{rootMargin:"-45% 0px -50% 0px"});
+  secs.forEach(function(s){spy.observe(s);});
+
+  var reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  // ---- stagger children ----
+  document.querySelectorAll(".bento,.steps,.gallery,.donate,.dl,.verify-grid,.strip .row").forEach(function(c){
+    c.classList.add("reveal","stagger");
+    [].forEach.call(c.children,function(ch,i){ch.style.transitionDelay=(i*70)+"ms";});
+    io.observe(c);
+  });
+
+  // ---- card tilt + moving spotlight ----
+  if(!reduce){
+    document.querySelectorAll(".tile,.don-card,.dl-card,.step").forEach(function(el){
+      el.addEventListener("pointermove",function(e){
+        var r=el.getBoundingClientRect(),px=(e.clientX-r.left)/r.width,py=(e.clientY-r.top)/r.height;
+        el.style.setProperty("--cx",(px*100)+"%");el.style.setProperty("--cy",(py*100)+"%");
+        el.style.transform="perspective(900px) rotateX("+((0.5-py)*5).toFixed(2)+"deg) rotateY("+((px-0.5)*6).toFixed(2)+"deg) translateY(-4px)";
+      },{passive:true});
+      el.addEventListener("pointerleave",function(){el.style.transform="";});
+    });
+  }
+
+  // ---- lightbox (click screenshots to enlarge) ----
+  var lb=document.getElementById("lb"),lbi=document.getElementById("lbimg");
+  function openLb(src,alt){lbi.src=src;lbi.alt=alt||"";lb.classList.add("open");lb.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";}
+  function closeLb(){lb.classList.remove("open");lb.setAttribute("aria-hidden","true");document.body.style.overflow="";}
+  document.querySelectorAll(".gallery figure").forEach(function(fig){
+    var img=fig.querySelector("img");
+    var zi=document.createElement("span");zi.className="zi";
+    zi.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
+    fig.appendChild(zi);
+    fig.addEventListener("click",function(){openLb(img.src,img.alt);});
+  });
+  var hw=document.querySelector(".window");
+  if(hw)hw.addEventListener("click",function(){
+    var vis=[].find.call(hw.querySelectorAll("img"),function(i){return getComputedStyle(i).display!=="none";});
+    if(vis)openLb(vis.src,vis.alt);});
+  document.querySelector(".lb-close").addEventListener("click",closeLb);
+  lb.addEventListener("click",function(e){if(e.target===lb)closeLb();});
+  addEventListener("keydown",function(e){if(e.key==="Escape")closeLb();});
+
+  // ---- animated background: raining PDF files + cursor spotlight ----
+  (function(){
+    if(reduce)return;
+    var cv=document.getElementById("bg"),ctx=cv.getContext("2d"),W,H,DPR=Math.min(2,devicePixelRatio||1);
+    var parts=[],mx=-9999,my=-9999,col="#D8131E";
+    function resize(){W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR;cv.style.width=innerWidth+"px";cv.style.height=innerHeight+"px";}
+    function make(){var n=Math.min(46,Math.floor(innerWidth/28));parts=[];for(var i=0;i<n;i++)parts.push({
+      x:Math.random()*W,y:Math.random()*H,vy:(0.18+Math.random()*0.55)*DPR,
+      s:(16+Math.random()*22)*DPR,a:0.05+Math.random()*0.11,
+      rot:(Math.random()-0.5)*0.5,rv:(Math.random()-0.5)*0.006,
+      sw:Math.random()*6.28,sv:0.004+Math.random()*0.009});}
+    function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+    // draw a little PDF file: page outline + folded corner + red "PDF" badge
+    function pdf(x,y,s,rot,alpha){
+      var w=s*0.78,h=s,fold=s*0.3,lw=Math.max(1.1,s*0.055);
+      ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.globalAlpha=alpha;
+      ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=lw;ctx.lineJoin="round";ctx.lineCap="round";
+      ctx.beginPath();
+      ctx.moveTo(-w/2,-h/2);ctx.lineTo(w/2-fold,-h/2);ctx.lineTo(w/2,-h/2+fold);
+      ctx.lineTo(w/2,h/2);ctx.lineTo(-w/2,h/2);ctx.closePath();ctx.stroke();
+      ctx.beginPath();ctx.moveTo(w/2-fold,-h/2);ctx.lineTo(w/2-fold,-h/2+fold);ctx.lineTo(w/2,-h/2+fold);ctx.stroke();
+      // red PDF badge
+      var bw=w*0.66,bh=h*0.2,by=h*0.07;
+      ctx.globalAlpha=alpha*1.25;rr(-bw/2,by,bw,bh,bh*0.3);ctx.fill();
+      ctx.restore();
+    }
+    function brand(){return getComputedStyle(root).getPropertyValue("--brand").trim()||"#D8131E";}
+    function tick(){ctx.clearRect(0,0,W,H);col=brand();
+      for(var i=0;i<parts.length;i++){var p=parts[i];p.sw+=p.sv;p.rot+=p.rv;p.x+=Math.sin(p.sw)*0.4*DPR;p.y+=p.vy;
+        var dx=p.x-mx,dy=p.y-my,d=Math.hypot(dx,dy),R=150*DPR,g=0;
+        if(d<R&&d>0){var f=1-d/R;p.x+=dx/d*f*2.6*DPR;p.y+=dy/d*f*2.6*DPR;g=f;p.rot+=f*0.02;}
+        if(p.y>H+40){p.y=-40;p.x=Math.random()*W;}if(p.x<-50)p.x=W+50;if(p.x>W+50)p.x=-50;
+        pdf(p.x,p.y,p.s,p.rot,Math.min(.5,p.a+g*0.4));}
+      requestAnimationFrame(tick);}
+    resize();make();tick();
+    addEventListener("resize",function(){resize();make();});
+    addEventListener("pointermove",function(e){mx=e.clientX*DPR;my=e.clientY*DPR;
+      root.style.setProperty("--mx",e.clientX+"px");root.style.setProperty("--my",e.clientY+"px");},{passive:true});
+  })();
+})();
+</script>
+</body>
+</html>

@@ -27,6 +27,7 @@ Every effect is pure CSS/Canvas/vanilla JS and degrades gracefully under `prefer
 
 | Effect | How it's done |
 | --- | --- |
+| 🎥 **Cinematic hero conversion** | A `<canvas>` overlaid on the hero screenshot plays the whole product story on loop: a red **PDF page shatters** into ~160 glowing shards, which give way to blue **Word blocks that fly in and assemble** ("DOCX"), a **green check floats** at center, then a luminous **wipe reveals the real app screenshot**. Pure canvas — hand-written particle physics, phased timeline, red/blue/white energy blooms; the canvas auto-sizes to the visible screenshot and replays on hover. |
 | 🌧️ **PDF rain background** | A full-page `<canvas id="bg">` renders falling PDF-page silhouettes (folded corner + red badge) that drift, rotate, and react to the cursor — they nudge aside and glow when the mouse gets close. |
 | 🔦 **Cursor spotlight** | A fixed radial glow tracks the pointer via CSS custom properties (`--mx` / `--my`), blended with `mix-blend-mode` (screen in dark, multiply in light). |
 | 🎴 **3D card tilt** | Cards tilt toward the cursor on `pointermove` and carry an internal moving sheen (`--cx` / `--cy`). |
@@ -45,8 +46,9 @@ Every effect is pure CSS/Canvas/vanilla JS and degrades gracefully under `prefer
 - **HTML5** — semantic, single file, all content inline.
 - **CSS** — modern features only: custom properties, `color-mix()`, `@property` registered custom properties,
   `conic-gradient`, CSS masking, `mix-blend-mode`, container-free responsive layout with `clamp()` and grid.
-- **Vanilla JavaScript** — no libraries. Canvas animation loop, `IntersectionObserver` reveals, pointer-driven
-  tilt/spotlight, theme + language state in `localStorage`, lightbox.
+- **Vanilla JavaScript** — no libraries. Two `<canvas>` engines (the cinematic hero conversion + the PDF-rain
+  background) with hand-written particle physics and `requestAnimationFrame` timelines, `IntersectionObserver`
+  reveals, pointer-driven tilt/spotlight, theme + language state in `localStorage`, lightbox.
 - **System font stack** — `-apple-system` / Segoe UI / Inter fallback. No web-font requests.
 - **Icons** — inline SVG, no icon library.
 - **Build** — none. **Dependencies** — none.

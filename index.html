@@ -17,10 +17,8 @@
   (function () {
     try {
       var t = localStorage.getItem("fpc-theme");
-      if (t === "light") document.documentElement.setAttribute("data-theme", "light");
-      else if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
-      else document.documentElement.setAttribute("data-theme",
-        window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      // default to dark; only honor an explicit saved choice
+      document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
       var l = localStorage.getItem("fpc-lang") || "en";
       document.documentElement.setAttribute("data-lang", l);
       document.documentElement.lang = l;

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pdfconverter.filaxy.net/sitemap.xml
